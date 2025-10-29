@@ -69,9 +69,14 @@ chromium.use(stealth);
   
   const page = await context.newPage();
   
+  // Generate unique email using timestamp
+  const timestamp = Date.now();
+  const uniqueEmail = `test${timestamp}@example.com`;
+  
   try {
     console.log('🎥 Video recording started with stealth mode...');
     console.log('🕵️ Bot detection bypass activated');
+    console.log(`📧 Using unique email: ${uniqueEmail}`);
     console.log('Navigating to page...');
     
     const originalUrl = 'https://mint.poap.studio/version-72bms/index-20/customdemoflow05';
@@ -125,8 +130,9 @@ chromium.use(stealth);
       }
     }
     
-    // Email or ETH/ENS Address field
-    await page.fill('input[name="email"], input[type="email"], input[placeholder*="Email"], input[placeholder*="email"], input[placeholder*="ETH"], input[placeholder*="ENS"]', 'test@example.com');
+    // Email or ETH/ENS Address field - USE UNIQUE EMAIL
+    console.log(`Filling email field with: ${uniqueEmail}`);
+    await page.fill('input[name="email"], input[type="email"], input[placeholder*="Email"], input[placeholder*="email"], input[placeholder*="ETH"], input[placeholder*="ENS"]', uniqueEmail);
     
     // Wait a moment before submitting
     await page.waitForTimeout(500);
@@ -236,6 +242,7 @@ chromium.use(stealth);
     
     // Final summary
     console.log('\n=== TEST SUMMARY ===');
+    console.log(`Email used: ${uniqueEmail}`);
     if (foundSuccess && !foundError) {
       console.log('✅ TEST PASSED: Form submitted successfully!');
     } else if (foundError) {
