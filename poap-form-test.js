@@ -49,10 +49,8 @@ chromium.use(stealth);
     }
   });
   
-  const page = await context.newPage();
-  
-  // Additional stealth measures
-  await page.evaluateOnNewDocument(() => {
+  // Additional stealth measures - add to context instead of page
+  await context.addInitScript(() => {
     // Override the navigator.webdriver property
     Object.defineProperty(navigator, 'webdriver', {
       get: () => false,
@@ -68,6 +66,8 @@ chromium.use(stealth);
       get: () => ['en-US', 'en'],
     });
   });
+  
+  const page = await context.newPage();
   
   try {
     console.log('🎥 Video recording started with stealth mode...');
