@@ -1,4 +1,5 @@
 const { chromium } = require('playwright');
+const path = require('path');
 
 (async () => {
   const browser = await chromium.launch({
@@ -6,9 +7,18 @@ const { chromium } = require('playwright');
     slowMo: 500 // Slows down operations by 500ms for visibility
   });
   
-  const page = await browser.newPage();
+  // Enable video recording in the context
+  const context = await browser.newContext({
+    recordVideo: {
+      dir: './videos',
+      size: { width: 1280, height: 720 }
+    }
+  });
+  
+  const page = await context.newPage();
   
   try {
+    console.log('🎥 Video recording started...');
     console.log('Navigating to page...');
     await page.goto('https://mint.poap.studio/version-72bms/index-20/customdemoflow05', {
       waitUntil: 'networkidle',
@@ -62,13 +72,10 @@ const { chromium } = require('playwright');
     // Email or ETH/ENS Address field
     await page.fill('input[name="email"], input[type="email"], input[placeholder*="Email"], input[placeholder*="email"], input[placeholder*="ETH"], input[placeholder*="ENS"]', 'test@example.com');
     
-    // Wait a moment before taking screenshot
+    // Wait a moment before submitting
     await page.waitForTimeout(500);
     
-    // SCREENSHOT 1: Before submitting the form
-    console.log('Taking screenshot 1: Before submitting...');
-    await page.screenshot({ path: '1-before-submit.png', fullPage: true });
-    console.log('✓ Screenshot 1 saved: 1-before-submit.png');
+    console.log('Form filled successfully');
     
     // Step 4: Click "Test" button
     console.log('Waiting for "Test" button to be clickable...');
@@ -85,12 +92,6 @@ const { chromium } = require('playwright');
     console.log('Clicking "Test" button...');
     await testButton.click();
     console.log('✓ Clicked "Test" button');
-    
-    // SCREENSHOT 2: Right after clicking (should show loading or immediate response)
-    await page.waitForTimeout(1000); // Wait 1 second for immediate response
-    console.log('Taking screenshot 2: Right after submit...');
-    await page.screenshot({ path: '2-after-submit.png', fullPage: true });
-    console.log('✓ Screenshot 2 saved: 2-after-submit.png');
     
     // Wait for redirect or navigation
     console.log('Waiting for redirect...');
@@ -112,23 +113,14 @@ const { chromium } = require('playwright');
     // Additional wait to ensure everything is rendered
     await page.waitForTimeout(2000);
     
-    // SCREENSHOT 3: Final page after redirect
     const finalUrl = page.url();
-    console.log('Taking screenshot 3: Final page...');
     console.log('Final URL:', finalUrl);
-    await page.screenshot({ path: '3-final-page.png', fullPage: true });
-    console.log('✓ Screenshot 3 saved: 3-final-page.png');
     
-    // ADDITIONAL SCREENSHOTS: Take 3 more screenshots every 3 seconds
-    console.log('\nTaking additional screenshots to capture page loading...');
-    
+    // Wait additional 9 seconds to capture the full page loading (matching previous 3x3s screenshots)
+    console.log('\nCapturing page loading in video...');
     for (let i = 1; i <= 3; i++) {
-      console.log(`Waiting 3 seconds before screenshot ${3 + i}...`);
+      console.log(`Recording... ${i * 3} seconds after redirect`);
       await page.waitForTimeout(3000);
-      
-      const screenshotPath = `${3 + i}-after-${i * 3}s.png`;
-      await page.screenshot({ path: screenshotPath, fullPage: true });
-      console.log(`✓ Screenshot ${3 + i} saved: ${screenshotPath} (${i * 3} seconds after redirect)`);
     }
     
     // Check for success
@@ -193,25 +185,28 @@ const { chromium } = require('playwright');
       console.log('⚠️ TEST UNCLEAR: Could not confirm success or failure');
     }
     
-    console.log('\n=== SCREENSHOTS SAVED ===');
-    console.log('1. 1-before-submit.png - Form filled, before clicking submit');
-    console.log('2. 2-after-submit.png - Right after clicking submit');
-    console.log('3. 3-final-page.png - Final page after redirect');
-    console.log('4. 4-after-3s.png - 3 seconds after redirect');
-    console.log('5. 5-after-6s.png - 6 seconds after redirect');
-    console.log('6. 6-after-9s.png - 9 seconds after redirect');
-    console.log('');
-    
-    // Wait a moment before closing to see the final result
+    // Wait a moment before closing
     await page.waitForTimeout(1000);
     
   } catch (error) {
     console.error('\n❌ TEST FAILED WITH ERROR:', error.message);
-    await page.screenshot({ path: 'error-screenshot.png', fullPage: true });
-    console.log('Error screenshot saved as error-screenshot.png');
     console.log('\nStack trace:', error.stack);
   } finally {
+    // Close the page to stop recording
+    await page.close();
+    
+    // Wait for the video to be saved
+    console.log('\n🎥 Saving video...');
+    await page.video()?.path().then(videoPath => {
+      console.log('✅ Video saved to:', videoPath);
+    }).catch(() => {
+      console.log('⚠️ Video path not available yet, it will be saved shortly');
+    });
+    
+    await context.close();
     await browser.close();
+    console.log('\n=== VIDEO RECORDING COMPLETE ===');
+    console.log('Video saved in ./videos/ directory');
     console.log('Browser closed');
   }
 })();
