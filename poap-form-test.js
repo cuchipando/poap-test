@@ -2,7 +2,7 @@ const { chromium } = require('playwright');
 
 (async () => {
   const browser = await chromium.launch({
-    headless: false, // Set to true for headless mode
+    headless: true, // Set to true for headless mode
     slowMo: 500 // Slows down operations by 500ms for visibility
   });
   
