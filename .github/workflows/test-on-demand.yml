@@ -25,10 +25,10 @@ jobs:
       - name: Run test
         run: node poap-form-test.js
         
-      - name: Upload screenshots
+      - name: Upload videos
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: poap-screenshots
-          path: '*.png'
+          name: poap-test-videos
+          path: 'videos/**/*.webm'
           retention-days: 7
