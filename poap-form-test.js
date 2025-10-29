@@ -1,24 +1,77 @@
-const { chromium } = require('playwright');
+const { chromium } = require('playwright-extra');
+const stealth = require('puppeteer-extra-plugin-stealth')();
 const path = require('path');
+
+// Add stealth plugin to playwright
+chromium.use(stealth);
 
 (async () => {
   const browser = await chromium.launch({
-    headless: true, // Set to true for headless mode
-    slowMo: 500 // Slows down operations by 500ms for visibility
+    headless: true,
+    args: [
+      '--disable-blink-features=AutomationControlled', // Remove automation flags
+      '--disable-dev-shm-usage',
+      '--no-sandbox',
+      '--disable-setuid-sandbox',
+      '--disable-web-security',
+      '--disable-features=IsolateOrigins,site-per-process'
+    ]
   });
   
-  // Enable video recording in the context
+  // Enable video recording with realistic browser context
   const context = await browser.newContext({
     recordVideo: {
       dir: './videos',
       size: { width: 1280, height: 720 }
+    },
+    // Set realistic viewport
+    viewport: { width: 1280, height: 720 },
+    // Set realistic user agent
+    userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    // Enable JavaScript
+    javaScriptEnabled: true,
+    // Accept downloads
+    acceptDownloads: true,
+    // Set locale and timezone
+    locale: 'en-US',
+    timezoneId: 'America/New_York',
+    // Set realistic permissions
+    permissions: ['geolocation', 'notifications'],
+    // Add extra HTTP headers
+    extraHTTPHeaders: {
+      'Accept-Language': 'en-US,en;q=0.9',
+      'Accept-Encoding': 'gzip, deflate, br',
+      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+      'Sec-Fetch-Dest': 'document',
+      'Sec-Fetch-Mode': 'navigate',
+      'Sec-Fetch-Site': 'none',
+      'Upgrade-Insecure-Requests': '1'
     }
   });
   
   const page = await context.newPage();
   
+  // Additional stealth measures
+  await page.evaluateOnNewDocument(() => {
+    // Override the navigator.webdriver property
+    Object.defineProperty(navigator, 'webdriver', {
+      get: () => false,
+    });
+    
+    // Override the plugins property
+    Object.defineProperty(navigator, 'plugins', {
+      get: () => [1, 2, 3, 4, 5],
+    });
+    
+    // Override the languages property
+    Object.defineProperty(navigator, 'languages', {
+      get: () => ['en-US', 'en'],
+    });
+  });
+  
   try {
-    console.log('🎥 Video recording started...');
+    console.log('🎥 Video recording started with stealth mode...');
+    console.log('🕵️ Bot detection bypass activated');
     console.log('Navigating to page...');
     
     const originalUrl = 'https://mint.poap.studio/version-72bms/index-20/customdemoflow05';
