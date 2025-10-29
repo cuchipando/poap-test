@@ -20,7 +20,10 @@ const path = require('path');
   try {
     console.log('🎥 Video recording started...');
     console.log('Navigating to page...');
-    await page.goto('https://mint.poap.studio/version-72bms/index-20/customdemoflow05', {
+    
+    const originalUrl = 'https://mint.poap.studio/version-72bms/index-20/customdemoflow05';
+    
+    await page.goto(originalUrl, {
       waitUntil: 'networkidle',
       timeout: 60000
     });
@@ -93,34 +96,37 @@ const path = require('path');
     await testButton.click();
     console.log('✓ Clicked "Test" button');
     
-    // Wait for redirect or navigation
-    console.log('Waiting for redirect...');
+    // Wait for redirect or navigation - IMPORTANT: This waits until URL actually changes
+    console.log('Waiting for URL to change (redirect)...');
+    let redirected = false;
+    
     try {
-      // Wait for URL to change (up to 10 seconds)
-      await page.waitForURL(url => url !== 'https://mint.poap.studio/version-72bms/index-20/customdemoflow05', { 
-        timeout: 10000 
+      // Wait for URL to change (up to 30 seconds)
+      await page.waitForURL(url => url !== originalUrl, { 
+        timeout: 30000 
       });
-      console.log('✓ Page redirected');
+      console.log('✓ Page redirected! URL changed.');
+      redirected = true;
     } catch (error) {
-      console.log('No URL change detected, checking for success message on same page...');
+      console.log('⚠️ No URL change detected after 30 seconds');
     }
     
-    // Wait for page to fully load
-    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {
-      console.log('Network not fully idle, continuing...');
-    });
-    
-    // Additional wait to ensure everything is rendered
-    await page.waitForTimeout(2000);
-    
-    const finalUrl = page.url();
-    console.log('Final URL:', finalUrl);
-    
-    // Wait additional 9 seconds to capture the full page loading (matching previous 3x3s screenshots)
-    console.log('\nCapturing page loading in video...');
-    for (let i = 1; i <= 3; i++) {
-      console.log(`Recording... ${i * 3} seconds after redirect`);
-      await page.waitForTimeout(3000);
+    if (redirected) {
+      const newUrl = page.url();
+      console.log('New URL:', newUrl);
+      
+      // Wait for page to fully load after redirect
+      await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {
+        console.log('Network not fully idle, continuing...');
+      });
+      
+      // NOW record for 9 seconds after the redirect
+      console.log('\n🎥 Recording for 9 seconds after redirect...');
+      for (let i = 1; i <= 3; i++) {
+        console.log(`Recording... ${i * 3} seconds after redirect`);
+        await page.waitForTimeout(3000);
+      }
+      console.log('✓ Finished 9-second recording period');
     }
     
     // Check for success
@@ -150,7 +156,7 @@ const path = require('path');
     
     if (!foundSuccess) {
       // Check if URL changed
-      if (currentUrl !== 'https://mint.poap.studio/version-72bms/index-20/customdemoflow05') {
+      if (currentUrl !== originalUrl) {
         console.log('✅ SUCCESS: Page redirected to:', currentUrl);
         foundSuccess = true;
       }
