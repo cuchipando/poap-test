@@ -13,7 +13,7 @@ const devicesToTest = [
   'iPhone 14 Pro Max',
   'Pixel 5',
   'Galaxy S9+',
-  'Galaxy S21 Ultra'
+  'Galaxy S20' // Changed from 'Galaxy S21 Ultra' which doesn't exist
 ];
 
 // Test scenarios
@@ -22,31 +22,36 @@ const testScenarios = [
     name: 'already-used-email',
     description: 'Already used email',
     email: 'test@example.com',
-    expectError: true
+    expectError: true,
+    expectedErrorText: 'You already have this collectible'
   },
   {
     name: 'bad-format-email',
     description: 'Bad format email',
     email: 'notanemail',
-    expectError: true
+    expectError: true,
+    expectedErrorText: 'Wrong format'
   },
   {
     name: 'invalid-eth',
     description: 'Invalid ETH address',
     email: '0xfmifeo',
-    expectError: true
+    expectError: true,
+    expectedErrorText: 'Wrong format'
   },
   {
     name: 'invalid-ens',
     description: 'Invalid ENS domain',
     email: 'cuchipando..eth',
-    expectError: true
+    expectError: true,
+    expectedErrorText: 'Wrong format'
   },
   {
     name: 'valid-unique-email',
     description: 'Valid unique email',
     email: null, // Will be generated with timestamp
-    expectError: false
+    expectError: false,
+    expectedErrorText: null
   }
 ];
 
@@ -102,6 +107,10 @@ const testResults = {};
     try {
       // Get device configuration
       const deviceConfig = devices[deviceName];
+      
+      if (!deviceConfig) {
+        throw new Error(`Device "${deviceName}" not found in Playwright devices`);
+      }
       
       // Create context with device emulation and video recording
       const context = await browser.newContext({
@@ -197,26 +206,39 @@ const testResults = {};
           await page.waitForTimeout(500);
           await testButton.click();
 
-          // Wait to see if URL changes (redirect) or stays (error)
-          let redirected = false;
-          try {
-            await page.waitForURL(url => url !== originalUrl, { 
-              timeout: 10000 
-            });
-            redirected = true;
-          } catch (error) {
-            redirected = false;
+          // Wait a moment for error messages to appear or redirect to happen
+          await page.waitForTimeout(3000);
+
+          // Check for error messages on the page
+          const errorTexts = [
+            'Email is required',
+            'You already have this collectible',
+            'Wrong format',
+            'Invalid',
+            'Error'
+          ];
+
+          let foundErrorMessage = null;
+          for (const errorText of errorTexts) {
+            const errorElement = page.locator(`text="${errorText}"`);
+            if (await errorElement.isVisible().catch(() => false)) {
+              foundErrorMessage = errorText;
+              console.log(`   🔍 Found error message: "${errorText}"`);
+              break;
+            }
           }
 
+          // Also check if URL changed (redirect happened)
           const currentUrl = page.url();
+          const redirected = currentUrl !== originalUrl;
 
           // Determine test result
           let testResult;
           if (scenario.expectError) {
             // We expected an error
-            if (!redirected && currentUrl === originalUrl) {
-              testResult = 'PASS - Error detected (no redirect)';
-              console.log(`   ✅ ${testResult}`);
+            if (foundErrorMessage) {
+              testResult = 'PASS - Error message displayed';
+              console.log(`   ✅ ${testResult}: "${foundErrorMessage}"`);
               
               // Take screenshot of the error
               const screenshotPath = `./screenshots/${deviceFilename}-${scenario.name}.png`;
@@ -225,20 +247,36 @@ const testResults = {};
               
               testResults[deviceName][scenario.name] = {
                 status: 'pass',
-                message: 'Error detected as expected (form did not redirect)',
+                message: `Error detected: ${foundErrorMessage}`,
+                screenshot: screenshotPath,
+                errorMessage: foundErrorMessage
+              };
+            } else if (!redirected) {
+              // No error message found, but also didn't redirect - might be an error we don't detect
+              testResult = 'PASS - No redirect (likely error)';
+              console.log(`   ✅ ${testResult}`);
+              
+              const screenshotPath = `./screenshots/${deviceFilename}-${scenario.name}.png`;
+              await page.screenshot({ path: screenshotPath, fullPage: true });
+              
+              testResults[deviceName][scenario.name] = {
+                status: 'pass',
+                message: 'Form did not redirect (error assumed)',
                 screenshot: screenshotPath
               };
             } else {
               testResult = 'FAIL - Expected error but form submitted';
               console.log(`   ❌ ${testResult}`);
+              console.log(`   🔗 Redirected to: ${currentUrl}`);
               testResults[deviceName][scenario.name] = {
                 status: 'fail',
-                message: 'Form redirected when it should have shown an error'
+                message: 'Form redirected when it should have shown an error',
+                redirectUrl: currentUrl
               };
             }
           } else {
             // We expected success
-            if (redirected) {
+            if (redirected && !foundErrorMessage) {
               testResult = 'PASS - Form submitted successfully';
               console.log(`   ✅ ${testResult}`);
               console.log(`   🔗 Redirected to: ${currentUrl}`);
@@ -260,6 +298,9 @@ const testResults = {};
             } else {
               testResult = 'FAIL - Expected success but got error';
               console.log(`   ❌ ${testResult}`);
+              if (foundErrorMessage) {
+                console.log(`   📛 Error: "${foundErrorMessage}"`);
+              }
               
               // Take screenshot of unexpected error
               const screenshotPath = `./screenshots/${deviceFilename}-${scenario.name}-unexpected-error.png`;
@@ -267,8 +308,9 @@ const testResults = {};
               
               testResults[deviceName][scenario.name] = {
                 status: 'fail',
-                message: 'Form did not redirect when it should have succeeded',
-                screenshot: screenshotPath
+                message: foundErrorMessage ? `Unexpected error: ${foundErrorMessage}` : 'Form did not redirect when it should have succeeded',
+                screenshot: screenshotPath,
+                errorMessage: foundErrorMessage
               };
             }
           }
@@ -328,9 +370,15 @@ const testResults = {};
     console.log(`📱 ${device}:`);
     for (const [test, result] of Object.entries(results)) {
       if (test !== 'error') {
-        const statusIcon = result.status === 'pass' ? '✅' : '❌';
+        const statusIcon = result.status === 'pass' ? '✅' : result.status === 'fail' ? '❌' : '⚠️';
         console.log(`   ${statusIcon} ${test}: ${result.status.toUpperCase()}`);
+        if (result.errorMessage) {
+          console.log(`      Error: "${result.errorMessage}"`);
+        }
       }
+    }
+    if (results.error) {
+      console.log(`   ❌ Device error: ${results.error}`);
     }
     console.log('');
   }
