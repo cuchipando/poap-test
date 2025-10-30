@@ -32,3 +32,19 @@ jobs:
           name: poap-test-videos
           path: 'videos/**/*.webm'
           retention-days: 7
+          
+      - name: Upload screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: poap-test-screenshots
+          path: 'screenshots/**/*.png'
+          retention-days: 7
+          
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: poap-test-results
+          path: 'test-results.json'
+          retention-days: 7
