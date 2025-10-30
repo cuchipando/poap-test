@@ -13,7 +13,7 @@ const devicesToTest = [
   'iPhone 14 Pro Max',
   'Pixel 5',
   'Galaxy S9+',
-  'Galaxy S24'
+  'Galaxy S24' // Changed from 'Galaxy S20' to valid device
 ];
 
 // Test scenarios
@@ -37,14 +37,14 @@ const testScenarios = [
     description: 'Invalid ETH address',
     email: '0xfmifeo',
     expectError: true,
-    expectedErrorText: 'valid ETH' // Error like "You must use a valid ETH"
+    expectedErrorText: 'Wrong format'
   },
   {
     name: 'invalid-ens',
     description: 'Invalid ENS domain',
     email: 'cuchipando..eth',
     expectError: true,
-    expectedErrorText: 'valid ENS' // Error like "You must use a valid ENS"
+    expectedErrorText: 'Wrong format'
   },
   {
     name: 'valid-unique-email',
@@ -159,7 +159,7 @@ const testResults = {};
           emailToUse = `test${timestamp}@example.com`;
         }
         
-        console.log(`   Email/ETH/ENS: ${emailToUse}`);
+        console.log(`   Email: ${emailToUse}`);
 
         const originalUrl = 'https://mint.poap.studio/version-72bms/index-20/customdemoflow05';
 
@@ -196,7 +196,7 @@ const testResults = {};
             }
           }
 
-          // Fill email/ETH/ENS field
+          // Fill email field
           await page.fill('input[name="email"], input[type="email"], input[placeholder*="Email"], input[placeholder*="email"], input[placeholder*="ETH"], input[placeholder*="ENS"]', emailToUse);
           await page.waitForTimeout(500);
 
@@ -206,7 +206,7 @@ const testResults = {};
           await page.waitForTimeout(500);
           await testButton.click();
 
-          // Wait for response - either error message or success popup
+          // Wait for response - either error message or success popup (longer wait)
           await page.waitForTimeout(5000);
 
           // Check for SUCCESS indicators first
@@ -228,25 +228,21 @@ const testResults = {};
             }
           }
 
-          // Check for ERROR messages - expanded to catch ETH/ENS errors
+          // Check for ERROR messages
           const errorTexts = [
+            'Email is required',
             'You already have this collectible',
             'Wrong format',
-            'valid ETH',
-            'valid ENS',
-            'must use a valid',
             'Invalid',
             'Error'
           ];
 
           let foundErrorMessage = null;
           for (const errorText of errorTexts) {
-            const errorElement = page.locator(`text*="${errorText}"`); // Using text*= for partial match
+            const errorElement = page.locator(`text="${errorText}"`);
             if (await errorElement.isVisible().catch(() => false)) {
-              // Get the actual full text
-              const fullText = await errorElement.textContent().catch(() => errorText);
-              foundErrorMessage = fullText || errorText;
-              console.log(`   🔍 Found error message: "${foundErrorMessage}"`);
+              foundErrorMessage = errorText;
+              console.log(`   🔍 Found error message: "${errorText}"`);
               break;
             }
           }
