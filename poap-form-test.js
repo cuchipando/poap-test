@@ -23,42 +23,35 @@ const testScenarios = [
     description: 'Already used email',
     email: 'test@example.com',
     expectError: true,
-    expectedErrorText: 'You already have this collectible',
-    needsEmailFallback: false
+    expectedErrorText: 'You already have this collectible'
   },
   {
     name: 'bad-format-email',
     description: 'Bad format email',
     email: 'notanemail',
     expectError: true,
-    expectedErrorText: 'Wrong format',
-    needsEmailFallback: false
+    expectedErrorText: 'Wrong format'
   },
   {
     name: 'invalid-eth',
     description: 'Invalid ETH address',
     email: '0xfmifeo',
     expectError: true,
-    expectedErrorText: 'Wrong format',
-    needsEmailFallback: true,
-    fallbackEmail: 'test@email.com'
+    expectedErrorText: 'valid ETH' // Error like "You must use a valid ETH"
   },
   {
     name: 'invalid-ens',
     description: 'Invalid ENS domain',
     email: 'cuchipando..eth',
     expectError: true,
-    expectedErrorText: 'Wrong format',
-    needsEmailFallback: true,
-    fallbackEmail: 'test@email.com'
+    expectedErrorText: 'valid ENS' // Error like "You must use a valid ENS"
   },
   {
     name: 'valid-unique-email',
     description: 'Valid unique email',
     email: null, // Will be generated with timestamp
     expectError: false,
-    expectedErrorText: null,
-    needsEmailFallback: false
+    expectedErrorText: null
   }
 ];
 
@@ -166,7 +159,7 @@ const testResults = {};
           emailToUse = `test${timestamp}@example.com`;
         }
         
-        console.log(`   Email: ${emailToUse}`);
+        console.log(`   Email/ETH/ENS: ${emailToUse}`);
 
         const originalUrl = 'https://mint.poap.studio/version-72bms/index-20/customdemoflow05';
 
@@ -203,46 +196,19 @@ const testResults = {};
             }
           }
 
-          // Fill the first email/ETH/ENS field
+          // Fill email/ETH/ENS field
           await page.fill('input[name="email"], input[type="email"], input[placeholder*="Email"], input[placeholder*="email"], input[placeholder*="ETH"], input[placeholder*="ENS"]', emailToUse);
-          console.log(`   ✅ Filled first field with: ${emailToUse}`);
-          await page.waitForTimeout(1500);
-
-          // For ETH/ENS tests, a new "Email (Required)" field should appear
-          if (scenario.needsEmailFallback) {
-            console.log(`   📧 Looking for "Email (Required)" field...`);
-            
-            // Wait a bit more for the new field to appear
-            await page.waitForTimeout(1000);
-            
-            // Get all email input fields
-            const emailFields = await page.locator('input[type="email"], input[placeholder*="Email"], input[placeholder*="email"]').all();
-            
-            console.log(`   Found ${emailFields.length} email fields total`);
-            
-            // The new field should be the last one (or second one)
-            if (emailFields.length >= 2) {
-              // Fill the last email field (the new "Email (Required)" one)
-              const newEmailField = emailFields[emailFields.length - 1];
-              await newEmailField.fill(scenario.fallbackEmail);
-              console.log(`   ✅ Filled "Email (Required)" field with: ${scenario.fallbackEmail}`);
-              await page.waitForTimeout(500);
-            } else {
-              console.log(`   ⚠️ Warning: Could not find separate "Email (Required)" field`);
-            }
-          }
+          await page.waitForTimeout(500);
 
           // Click Test button
           const testButton = page.locator('text="Test"');
           await testButton.waitFor({ state: 'visible', timeout: 15000 });
           await page.waitForTimeout(500);
           await testButton.click();
-          console.log(`   🔘 Clicked Test button`);
 
-          // Wait for response
+          // Wait for response - either error message or success popup
           await page.waitForTimeout(5000);
 
-          // Now check for final result - either success or error
           // Check for SUCCESS indicators first
           const successTexts = [
             'CONGRATULATIONS',
@@ -262,20 +228,25 @@ const testResults = {};
             }
           }
 
-          // Check for ERROR messages
+          // Check for ERROR messages - expanded to catch ETH/ENS errors
           const errorTexts = [
             'You already have this collectible',
             'Wrong format',
+            'valid ETH',
+            'valid ENS',
+            'must use a valid',
             'Invalid',
             'Error'
           ];
 
           let foundErrorMessage = null;
           for (const errorText of errorTexts) {
-            const errorElement = page.locator(`text="${errorText}"`);
+            const errorElement = page.locator(`text*="${errorText}"`); // Using text*= for partial match
             if (await errorElement.isVisible().catch(() => false)) {
-              foundErrorMessage = errorText;
-              console.log(`   🔍 Found error message: "${errorText}"`);
+              // Get the actual full text
+              const fullText = await errorElement.textContent().catch(() => errorText);
+              foundErrorMessage = fullText || errorText;
+              console.log(`   🔍 Found error message: "${foundErrorMessage}"`);
               break;
             }
           }
