@@ -13,7 +13,7 @@ const devicesToTest = [
   'iPhone 14 Pro Max',
   'Pixel 5',
   'Galaxy S9+',
-  'Galaxy S20' // Changed from 'Galaxy S21 Ultra' which doesn't exist
+  'Galaxy S24' // Changed from 'Galaxy S20' to valid device
 ];
 
 // Test scenarios
@@ -206,10 +206,29 @@ const testResults = {};
           await page.waitForTimeout(500);
           await testButton.click();
 
-          // Wait a moment for error messages to appear or redirect to happen
-          await page.waitForTimeout(3000);
+          // Wait for response - either error message or success popup (longer wait)
+          await page.waitForTimeout(5000);
 
-          // Check for error messages on the page
+          // Check for SUCCESS indicators first
+          const successTexts = [
+            'CONGRATULATIONS',
+            'Congratulations',
+            'You have just collected',
+            'Custom Demo Flow',
+            'Show Details'
+          ];
+
+          let foundSuccessMessage = null;
+          for (const successText of successTexts) {
+            const successElement = page.locator(`text="${successText}"`);
+            if (await successElement.isVisible().catch(() => false)) {
+              foundSuccessMessage = successText;
+              console.log(`   🎉 Found success message: "${successText}"`);
+              break;
+            }
+          }
+
+          // Check for ERROR messages
           const errorTexts = [
             'Email is required',
             'You already have this collectible',
@@ -251,6 +270,13 @@ const testResults = {};
                 screenshot: screenshotPath,
                 errorMessage: foundErrorMessage
               };
+            } else if (foundSuccessMessage) {
+              testResult = 'FAIL - Expected error but got success';
+              console.log(`   ❌ ${testResult}: "${foundSuccessMessage}"`);
+              testResults[deviceName][scenario.name] = {
+                status: 'fail',
+                message: `Form succeeded when it should have shown an error. Success message: ${foundSuccessMessage}`
+              };
             } else if (!redirected) {
               // No error message found, but also didn't redirect - might be an error we don't detect
               testResult = 'PASS - No redirect (likely error)';
@@ -276,15 +302,32 @@ const testResults = {};
             }
           } else {
             // We expected success
-            if (redirected && !foundErrorMessage) {
-              testResult = 'PASS - Form submitted successfully';
+            if (foundSuccessMessage && !foundErrorMessage) {
+              testResult = 'PASS - Success popup displayed';
+              console.log(`   ✅ ${testResult}: "${foundSuccessMessage}"`);
+              
+              // Wait for page to fully load
+              await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+              
+              // Record for 9 seconds after success
+              console.log('   🎥 Recording for 9 seconds after success...');
+              for (let j = 1; j <= 3; j++) {
+                await page.waitForTimeout(3000);
+              }
+              
+              testResults[deviceName][scenario.name] = {
+                status: 'pass',
+                message: `Form submitted successfully. Success message: ${foundSuccessMessage}`,
+                successMessage: foundSuccessMessage,
+                currentUrl: currentUrl
+              };
+            } else if (redirected && !foundErrorMessage) {
+              testResult = 'PASS - Form redirected successfully';
               console.log(`   ✅ ${testResult}`);
               console.log(`   🔗 Redirected to: ${currentUrl}`);
               
-              // Wait for page to load
               await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
               
-              // Record for 9 seconds after redirect
               console.log('   🎥 Recording for 9 seconds after redirect...');
               for (let j = 1; j <= 3; j++) {
                 await page.waitForTimeout(3000);
@@ -308,7 +351,7 @@ const testResults = {};
               
               testResults[deviceName][scenario.name] = {
                 status: 'fail',
-                message: foundErrorMessage ? `Unexpected error: ${foundErrorMessage}` : 'Form did not redirect when it should have succeeded',
+                message: foundErrorMessage ? `Unexpected error: ${foundErrorMessage}` : 'Form did not show success or redirect',
                 screenshot: screenshotPath,
                 errorMessage: foundErrorMessage
               };
@@ -374,6 +417,9 @@ const testResults = {};
         console.log(`   ${statusIcon} ${test}: ${result.status.toUpperCase()}`);
         if (result.errorMessage) {
           console.log(`      Error: "${result.errorMessage}"`);
+        }
+        if (result.successMessage) {
+          console.log(`      Success: "${result.successMessage}"`);
         }
       }
     }
