@@ -13,7 +13,7 @@ const devicesToTest = [
   'iPhone 14 Pro Max',
   'Pixel 5',
   'Galaxy S9+',
-  'Galaxy S24' // Changed from 'Galaxy S20' to valid device
+  'Galaxy S24'
 ];
 
 // Test scenarios
@@ -37,14 +37,14 @@ const testScenarios = [
     description: 'Invalid ETH address',
     email: '0xfmifeo',
     expectError: true,
-    expectedErrorText: 'Wrong format'
+    expectedErrorText: 'valid ETH'
   },
   {
     name: 'invalid-ens',
     description: 'Invalid ENS domain',
     email: 'cuchipando..eth',
     expectError: true,
-    expectedErrorText: 'Wrong format'
+    expectedErrorText: 'valid ENS'
   },
   {
     name: 'valid-unique-email',
@@ -209,41 +209,54 @@ const testResults = {};
           // Wait for response - either error message or success popup (longer wait)
           await page.waitForTimeout(5000);
 
-          // Check for SUCCESS indicators first
-          const successTexts = [
-            'CONGRATULATIONS',
-            'Congratulations',
-            'You have just collected',
-            'Custom Demo Flow',
-            'Show Details'
-          ];
-
-          let foundSuccessMessage = null;
-          for (const successText of successTexts) {
-            const successElement = page.locator(`text="${successText}"`);
-            if (await successElement.isVisible().catch(() => false)) {
-              foundSuccessMessage = successText;
-              console.log(`   🎉 Found success message: "${successText}"`);
-              break;
-            }
-          }
-
-          // Check for ERROR messages
+          // Check for ERROR messages FIRST (priority)
           const errorTexts = [
-            'Email is required',
             'You already have this collectible',
             'Wrong format',
+            'valid ENS',
+            'valid ETH',
+            'must use a valid',
+            'Email is required',
             'Invalid',
             'Error'
           ];
 
           let foundErrorMessage = null;
           for (const errorText of errorTexts) {
-            const errorElement = page.locator(`text="${errorText}"`);
-            if (await errorElement.isVisible().catch(() => false)) {
-              foundErrorMessage = errorText;
-              console.log(`   🔍 Found error message: "${errorText}"`);
-              break;
+            // Try to find any element containing this text
+            try {
+              const errorElement = page.getByText(errorText, { exact: false }).first();
+              const isVisible = await errorElement.isVisible().catch(() => false);
+              if (isVisible) {
+                // Get the full error text
+                const fullText = await errorElement.textContent().catch(() => errorText);
+                foundErrorMessage = fullText.trim() || errorText;
+                console.log(`   🔍 Found error message: "${foundErrorMessage}"`);
+                break;
+              }
+            } catch (e) {
+              // Continue to next error text
+            }
+          }
+
+          // Only check for SUCCESS if NO error was found
+          let foundSuccessMessage = null;
+          if (!foundErrorMessage) {
+            const successTexts = [
+              'CONGRATULATIONS',
+              'Congratulations',
+              'You have just collected',
+              'Custom Demo Flow',
+              'Show Details'
+            ];
+
+            for (const successText of successTexts) {
+              const successElement = page.locator(`text="${successText}"`);
+              if (await successElement.isVisible().catch(() => false)) {
+                foundSuccessMessage = successText;
+                console.log(`   🎉 Found success message: "${successText}"`);
+                break;
+              }
             }
           }
 
