@@ -203,37 +203,44 @@ const testResults = {};
             }
           }
 
-          // Fill email field (first attempt)
+          // Fill the first email/ETH/ENS field
           await page.fill('input[name="email"], input[type="email"], input[placeholder*="Email"], input[placeholder*="email"], input[placeholder*="ETH"], input[placeholder*="ENS"]', emailToUse);
-          await page.waitForTimeout(500);
+          console.log(`   ✅ Filled first field with: ${emailToUse}`);
+          await page.waitForTimeout(1500);
 
-          // Click Test button (first attempt)
+          // For ETH/ENS tests, a new "Email (Required)" field should appear
+          if (scenario.needsEmailFallback) {
+            console.log(`   📧 Looking for "Email (Required)" field...`);
+            
+            // Wait a bit more for the new field to appear
+            await page.waitForTimeout(1000);
+            
+            // Get all email input fields
+            const emailFields = await page.locator('input[type="email"], input[placeholder*="Email"], input[placeholder*="email"]').all();
+            
+            console.log(`   Found ${emailFields.length} email fields total`);
+            
+            // The new field should be the last one (or second one)
+            if (emailFields.length >= 2) {
+              // Fill the last email field (the new "Email (Required)" one)
+              const newEmailField = emailFields[emailFields.length - 1];
+              await newEmailField.fill(scenario.fallbackEmail);
+              console.log(`   ✅ Filled "Email (Required)" field with: ${scenario.fallbackEmail}`);
+              await page.waitForTimeout(500);
+            } else {
+              console.log(`   ⚠️ Warning: Could not find separate "Email (Required)" field`);
+            }
+          }
+
+          // Click Test button
           const testButton = page.locator('text="Test"');
           await testButton.waitFor({ state: 'visible', timeout: 15000 });
           await page.waitForTimeout(500);
           await testButton.click();
+          console.log(`   🔘 Clicked Test button`);
 
           // Wait for response
-          await page.waitForTimeout(3000);
-
-          // Check if "Email is required" error appeared (for ETH/ENS tests)
-          const emailRequiredError = page.locator('text="Email is required"');
-          const hasEmailRequiredError = await emailRequiredError.isVisible().catch(() => false);
-
-          if (hasEmailRequiredError && scenario.needsEmailFallback) {
-            console.log(`   📧 "Email is required" detected - filling fallback email: ${scenario.fallbackEmail}`);
-            
-            // Fill the fallback email
-            await page.fill('input[name="email"], input[type="email"], input[placeholder*="Email"], input[placeholder*="email"]', scenario.fallbackEmail);
-            await page.waitForTimeout(500);
-            
-            // Click Test button again
-            await testButton.click();
-            console.log('   🔄 Clicked Test button again with email filled');
-            
-            // Wait for response after second click
-            await page.waitForTimeout(3000);
-          }
+          await page.waitForTimeout(5000);
 
           // Now check for final result - either success or error
           // Check for SUCCESS indicators first
