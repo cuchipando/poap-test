@@ -13,7 +13,7 @@ const devicesToTest = [
   'iPhone 14 Pro Max',
   'Pixel 5',
   'Galaxy S9+',
-  'Galaxy S24' // Changed from 'Galaxy S20' to valid device
+  'Galaxy S24'
 ];
 
 // Test scenarios
@@ -23,35 +23,42 @@ const testScenarios = [
     description: 'Already used email',
     email: 'test@example.com',
     expectError: true,
-    expectedErrorText: 'You already have this collectible'
+    expectedErrorText: 'You already have this collectible',
+    needsEmailFallback: false
   },
   {
     name: 'bad-format-email',
     description: 'Bad format email',
     email: 'notanemail',
     expectError: true,
-    expectedErrorText: 'Wrong format'
+    expectedErrorText: 'Wrong format',
+    needsEmailFallback: false
   },
   {
     name: 'invalid-eth',
     description: 'Invalid ETH address',
     email: '0xfmifeo',
     expectError: true,
-    expectedErrorText: 'Wrong format'
+    expectedErrorText: 'Wrong format',
+    needsEmailFallback: true,
+    fallbackEmail: 'test@email.com'
   },
   {
     name: 'invalid-ens',
     description: 'Invalid ENS domain',
     email: 'cuchipando..eth',
     expectError: true,
-    expectedErrorText: 'Wrong format'
+    expectedErrorText: 'Wrong format',
+    needsEmailFallback: true,
+    fallbackEmail: 'test@email.com'
   },
   {
     name: 'valid-unique-email',
     description: 'Valid unique email',
     email: null, // Will be generated with timestamp
     expectError: false,
-    expectedErrorText: null
+    expectedErrorText: null,
+    needsEmailFallback: false
   }
 ];
 
@@ -196,19 +203,39 @@ const testResults = {};
             }
           }
 
-          // Fill email field
+          // Fill email field (first attempt)
           await page.fill('input[name="email"], input[type="email"], input[placeholder*="Email"], input[placeholder*="email"], input[placeholder*="ETH"], input[placeholder*="ENS"]', emailToUse);
           await page.waitForTimeout(500);
 
-          // Click Test button
+          // Click Test button (first attempt)
           const testButton = page.locator('text="Test"');
           await testButton.waitFor({ state: 'visible', timeout: 15000 });
           await page.waitForTimeout(500);
           await testButton.click();
 
-          // Wait for response - either error message or success popup (longer wait)
-          await page.waitForTimeout(5000);
+          // Wait for response
+          await page.waitForTimeout(3000);
 
+          // Check if "Email is required" error appeared (for ETH/ENS tests)
+          const emailRequiredError = page.locator('text="Email is required"');
+          const hasEmailRequiredError = await emailRequiredError.isVisible().catch(() => false);
+
+          if (hasEmailRequiredError && scenario.needsEmailFallback) {
+            console.log(`   📧 "Email is required" detected - filling fallback email: ${scenario.fallbackEmail}`);
+            
+            // Fill the fallback email
+            await page.fill('input[name="email"], input[type="email"], input[placeholder*="Email"], input[placeholder*="email"]', scenario.fallbackEmail);
+            await page.waitForTimeout(500);
+            
+            // Click Test button again
+            await testButton.click();
+            console.log('   🔄 Clicked Test button again with email filled');
+            
+            // Wait for response after second click
+            await page.waitForTimeout(3000);
+          }
+
+          // Now check for final result - either success or error
           // Check for SUCCESS indicators first
           const successTexts = [
             'CONGRATULATIONS',
@@ -230,7 +257,6 @@ const testResults = {};
 
           // Check for ERROR messages
           const errorTexts = [
-            'Email is required',
             'You already have this collectible',
             'Wrong format',
             'Invalid',
