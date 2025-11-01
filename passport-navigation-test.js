@@ -147,14 +147,46 @@ const testResults = {};
             timeout: 60000
           });
 
-          await page.waitForTimeout(2000);
+          await page.waitForTimeout(3000);
 
-          // Try to find and fill the input field (could be email, ENS, or ETH)
+          // STEP 1: Click the initial "Start" button on welcome page
+          console.log('   Looking for initial Start button...');
+          const initialStartSelectors = [
+            'button:has-text("Start")',
+            'button:has-text("Get Started")',
+            'button:has-text("Begin")',
+            'a:has-text("Start")',
+            '[data-action="start"]',
+            'button'
+          ];
+
+          let startClicked = false;
+          for (const selector of initialStartSelectors) {
+            try {
+              const startButton = await page.locator(selector).first();
+              if (await startButton.isVisible({ timeout: 3000 })) {
+                await startButton.click();
+                console.log(`   ✓ Clicked initial Start button`);
+                startClicked = true;
+                await page.waitForTimeout(2000);
+                break;
+              }
+            } catch (e) {
+              continue;
+            }
+          }
+
+          if (!startClicked) {
+            console.log('   ⚠️ Could not find initial Start button, trying to continue...');
+          }
+
+          // STEP 2: Now find and fill the input field
           const inputSelectors = [
             'input[type="email"]',
             'input[placeholder*="email" i]',
             'input[placeholder*="ENS" i]',
             'input[placeholder*="ETH" i]',
+            'input[placeholder*="address" i]',
             'input[type="text"]',
             'input'
           ];
@@ -163,10 +195,11 @@ const testResults = {};
           for (const selector of inputSelectors) {
             try {
               const input = await page.locator(selector).first();
-              if (await input.isVisible({ timeout: 2000 })) {
+              if (await input.isVisible({ timeout: 3000 })) {
                 await input.fill(scenario.input);
                 inputFilled = true;
                 console.log(`   ✓ Filled input with: ${scenario.input}`);
+                await page.waitForTimeout(1000);
                 break;
               }
             } catch (e) {
@@ -183,25 +216,23 @@ const testResults = {};
             continue;
           }
 
-          await page.waitForTimeout(1000);
-
-          // Try to find and click Start/Continue button
-          const buttonSelectors = [
-            'button:has-text("Start")',
+          // STEP 3: Click Continue/Submit button
+          const submitSelectors = [
             'button:has-text("Continue")',
             'button:has-text("Next")',
+            'button:has-text("Submit")',
             'button[type="submit"]',
-            'button'
+            'button:not(:has-text("Start"))'
           ];
 
-          let buttonClicked = false;
-          for (const selector of buttonSelectors) {
+          let submitClicked = false;
+          for (const selector of submitSelectors) {
             try {
               const button = await page.locator(selector).first();
               if (await button.isVisible({ timeout: 2000 })) {
                 await button.click();
-                buttonClicked = true;
-                console.log(`   ✓ Clicked button`);
+                submitClicked = true;
+                console.log(`   ✓ Clicked Continue/Submit button`);
                 break;
               }
             } catch (e) {
@@ -211,8 +242,8 @@ const testResults = {};
 
           await page.waitForTimeout(3000);
 
-          // Check for error message
-          const errorKeywords = ['valid', 'invalid', 'error', 'format', 'required'];
+          // STEP 4: Check for error message
+          const errorKeywords = ['valid', 'invalid', 'error', 'format', 'required', 'incorrect'];
           let foundError = false;
 
           for (const keyword of errorKeywords) {
@@ -268,25 +299,54 @@ const testResults = {};
           timeout: 60000
         });
 
-        await page.waitForTimeout(2000);
+        await page.waitForTimeout(3000);
 
-        // Enter valid email
+        // STEP 1: Click initial Start button
+        console.log('Clicking initial Start button...');
+        const initialStartSelectors = [
+          'button:has-text("Start")',
+          'button:has-text("Get Started")',
+          'button:has-text("Begin")',
+          'a:has-text("Start")',
+          'button'
+        ];
+
+        for (const selector of initialStartSelectors) {
+          try {
+            const startButton = await page.locator(selector).first();
+            if (await startButton.isVisible({ timeout: 3000 })) {
+              await startButton.click();
+              console.log('✓ Clicked initial Start button');
+              await page.waitForTimeout(2000);
+              break;
+            }
+          } catch (e) {
+            continue;
+          }
+        }
+
+        // STEP 2: Enter valid email
         const timestamp = Date.now();
         const validEmail = `test${timestamp}@example.com`;
         
+        console.log('Looking for input field...');
         const inputSelectors = [
           'input[type="email"]',
           'input[placeholder*="email" i]',
+          'input[placeholder*="address" i]',
           'input[type="text"]',
           'input'
         ];
 
+        let inputFound = false;
         for (const selector of inputSelectors) {
           try {
             const input = await page.locator(selector).first();
-            if (await input.isVisible({ timeout: 2000 })) {
+            if (await input.isVisible({ timeout: 3000 })) {
               await input.fill(validEmail);
               console.log(`✓ Entered valid email: ${validEmail}`);
+              inputFound = true;
+              await page.waitForTimeout(1000);
               break;
             }
           } catch (e) {
@@ -294,22 +354,24 @@ const testResults = {};
           }
         }
 
-        await page.waitForTimeout(1000);
+        if (!inputFound) {
+          throw new Error('Could not find input field after clicking Start');
+        }
 
-        // Click Start/Continue
-        const buttonSelectors = [
-          'button:has-text("Start")',
+        // STEP 3: Click Continue/Submit
+        const submitSelectors = [
           'button:has-text("Continue")',
           'button:has-text("Next")',
+          'button:has-text("Submit")',
           'button[type="submit"]'
         ];
 
-        for (const selector of buttonSelectors) {
+        for (const selector of submitSelectors) {
           try {
             const button = await page.locator(selector).first();
             if (await button.isVisible({ timeout: 2000 })) {
               await button.click();
-              console.log(`✓ Clicked Start/Continue button`);
+              console.log(`✓ Clicked Continue button`);
               break;
             }
           } catch (e) {
@@ -317,7 +379,7 @@ const testResults = {};
           }
         }
 
-        await page.waitForTimeout(3000);
+        await page.waitForTimeout(4000);
 
         const initialUrl = page.url();
         console.log(`Current URL: ${initialUrl}`);
@@ -330,16 +392,19 @@ const testResults = {};
             'text="Collection"',
             '[data-section="collection"]',
             'a:has-text("Collection")',
-            'button:has-text("Collection")'
+            'button:has-text("Collection")',
+            '[aria-label*="Collection" i]'
           ];
 
+          let collectionFound = false;
           for (const selector of collectionSelectors) {
             try {
               const collectionLink = await page.locator(selector).first();
               if (await collectionLink.isVisible({ timeout: 2000 })) {
                 await collectionLink.click();
                 console.log('   ✓ Clicked Collection section');
-                await page.waitForTimeout(2000);
+                collectionFound = true;
+                await page.waitForTimeout(3000);
                 break;
               }
             } catch (e) {
@@ -347,20 +412,27 @@ const testResults = {};
             }
           }
 
-          // Click first item in collection
+          if (!collectionFound) {
+            console.log('   ℹ️ Collection section not found or already visible');
+          }
+
+          // Click first item in collection (these are Benefits)
           const itemSelectors = [
-            '.collection-item',
-            '[data-type="benefit"]',
             'article',
-            'div[role="button"]'
+            '[data-testid*="item"]',
+            '[data-type="benefit"]',
+            'div[role="button"]',
+            'a[href*="benefit"]'
           ];
 
+          let itemClicked = false;
           for (const selector of itemSelectors) {
             try {
               const item = await page.locator(selector).first();
               if (await item.isVisible({ timeout: 2000 })) {
                 await item.click();
-                console.log('   ✓ Clicked item in Collection');
+                console.log('   ✓ Clicked item in Collection (should be a Benefit)');
+                itemClicked = true;
                 await page.waitForTimeout(3000);
                 
                 const newUrl = page.url();
@@ -374,10 +446,17 @@ const testResults = {};
             }
           }
 
-          testResults[deviceName].navigationTest.collection = {
-            status: 'pass',
-            message: 'Successfully navigated Collection section'
-          };
+          if (itemClicked) {
+            testResults[deviceName].navigationTest.collection = {
+              status: 'pass',
+              message: 'Successfully navigated Collection section'
+            };
+          } else {
+            testResults[deviceName].navigationTest.collection = {
+              status: 'fail',
+              message: 'Could not click item in Collection'
+            };
+          }
         } catch (error) {
           console.log(`   ❌ Collection navigation error: ${error.message}`);
           testResults[deviceName].navigationTest.collection = {
@@ -387,8 +466,23 @@ const testResults = {};
         }
 
         // Go back to main page
+        console.log('\n   Going back to main page...');
         await page.goto(passportUrl, { waitUntil: 'networkidle' });
-        await page.waitForTimeout(2000);
+        await page.waitForTimeout(3000);
+
+        // Click Start again
+        for (const selector of initialStartSelectors) {
+          try {
+            const startButton = await page.locator(selector).first();
+            if (await startButton.isVisible({ timeout: 2000 })) {
+              await startButton.click();
+              await page.waitForTimeout(2000);
+              break;
+            }
+          } catch (e) {
+            continue;
+          }
+        }
 
         // Navigate to Benefits section and click an item
         console.log('\n2. Testing Benefits section...');
@@ -397,16 +491,19 @@ const testResults = {};
             'text="Benefits"',
             '[data-section="benefits"]',
             'a:has-text("Benefits")',
-            'button:has-text("Benefits")'
+            'button:has-text("Benefits")',
+            '[aria-label*="Benefits" i]'
           ];
 
+          let benefitsFound = false;
           for (const selector of benefitsSelectors) {
             try {
               const benefitsLink = await page.locator(selector).first();
               if (await benefitsLink.isVisible({ timeout: 2000 })) {
                 await benefitsLink.click();
                 console.log('   ✓ Clicked Benefits section');
-                await page.waitForTimeout(2000);
+                benefitsFound = true;
+                await page.waitForTimeout(3000);
                 break;
               }
             } catch (e) {
@@ -414,48 +511,54 @@ const testResults = {};
             }
           }
 
+          if (!benefitsFound) {
+            console.log('   ℹ️ Benefits section not found or already visible');
+          }
+
           // Click first benefit item
           const itemSelectors = [
-            '.benefit-item',
             'article',
+            '[data-testid*="benefit"]',
+            '[data-type="benefit"]',
             'div[role="button"]',
-            '[data-type="benefit"]'
+            'a[href*="benefit"]'
           ];
 
+          let itemClicked = false;
           for (const selector of itemSelectors) {
             try {
               const item = await page.locator(selector).first();
               if (await item.isVisible({ timeout: 2000 })) {
                 await item.click();
                 console.log('   ✓ Clicked item in Benefits');
+                itemClicked = true;
                 await page.waitForTimeout(3000);
                 
                 // Try to click an item detail within the benefit to go to collectible
-                try {
-                  const detailSelectors = [
-                    '.collectible-item',
-                    'article',
-                    'div[role="button"]'
-                  ];
-                  
-                  for (const detailSelector of detailSelectors) {
-                    try {
-                      const detailItem = await page.locator(detailSelector).first();
-                      if (await detailItem.isVisible({ timeout: 2000 })) {
-                        await detailItem.click();
-                        console.log('   ✓ Clicked item detail (should go to collectible)');
-                        await page.waitForTimeout(3000);
-                        
-                        const collectibleUrl = page.url();
-                        console.log(`   ✓ At collectible: ${collectibleUrl}`);
-                        break;
-                      }
-                    } catch (e) {
-                      continue;
+                console.log('   Looking for collectible item within benefit...');
+                const collectibleSelectors = [
+                  'article',
+                  '[data-testid*="collectible"]',
+                  '[data-type="collectible"]',
+                  'div[role="button"]',
+                  'a[href*="collectible"]'
+                ];
+                
+                for (const collSelector of collectibleSelectors) {
+                  try {
+                    const collectibleItem = await page.locator(collSelector).first();
+                    if (await collectibleItem.isVisible({ timeout: 2000 })) {
+                      await collectibleItem.click();
+                      console.log('   ✓ Clicked collectible item from benefit detail');
+                      await page.waitForTimeout(3000);
+                      
+                      const collectibleUrl = page.url();
+                      console.log(`   ✓ At collectible: ${collectibleUrl}`);
+                      break;
                     }
+                  } catch (e) {
+                    continue;
                   }
-                } catch (e) {
-                  console.log('   ⚠️ Could not navigate to collectible from benefit');
                 }
                 
                 break;
@@ -465,10 +568,17 @@ const testResults = {};
             }
           }
 
-          testResults[deviceName].navigationTest.benefits = {
-            status: 'pass',
-            message: 'Successfully navigated Benefits section'
-          };
+          if (itemClicked) {
+            testResults[deviceName].navigationTest.benefits = {
+              status: 'pass',
+              message: 'Successfully navigated Benefits section'
+            };
+          } else {
+            testResults[deviceName].navigationTest.benefits = {
+              status: 'fail',
+              message: 'Could not click item in Benefits'
+            };
+          }
         } catch (error) {
           console.log(`   ❌ Benefits navigation error: ${error.message}`);
           testResults[deviceName].navigationTest.benefits = {
@@ -478,8 +588,23 @@ const testResults = {};
         }
 
         // Go back to main page
+        console.log('\n   Going back to main page...');
         await page.goto(passportUrl, { waitUntil: 'networkidle' });
-        await page.waitForTimeout(2000);
+        await page.waitForTimeout(3000);
+
+        // Click Start again
+        for (const selector of initialStartSelectors) {
+          try {
+            const startButton = await page.locator(selector).first();
+            if (await startButton.isVisible({ timeout: 2000 })) {
+              await startButton.click();
+              await page.waitForTimeout(2000);
+              break;
+            }
+          } catch (e) {
+            continue;
+          }
+        }
 
         // Navigate to Hunts section and click an item
         console.log('\n3. Testing Hunts section...');
@@ -488,16 +613,19 @@ const testResults = {};
             'text="Hunts"',
             '[data-section="hunts"]',
             'a:has-text("Hunts")',
-            'button:has-text("Hunts")'
+            'button:has-text("Hunts")',
+            '[aria-label*="Hunts" i]'
           ];
 
+          let huntsFound = false;
           for (const selector of huntsSelectors) {
             try {
               const huntsLink = await page.locator(selector).first();
               if (await huntsLink.isVisible({ timeout: 2000 })) {
                 await huntsLink.click();
                 console.log('   ✓ Clicked Hunts section');
-                await page.waitForTimeout(2000);
+                huntsFound = true;
+                await page.waitForTimeout(3000);
                 break;
               }
             } catch (e) {
@@ -505,48 +633,54 @@ const testResults = {};
             }
           }
 
+          if (!huntsFound) {
+            console.log('   ℹ️ Hunts section not found or already visible');
+          }
+
           // Click first hunt item
           const itemSelectors = [
-            '.hunt-item',
             'article',
+            '[data-testid*="hunt"]',
+            '[data-type="hunt"]',
             'div[role="button"]',
-            '[data-type="hunt"]'
+            'a[href*="hunt"]'
           ];
 
+          let itemClicked = false;
           for (const selector of itemSelectors) {
             try {
               const item = await page.locator(selector).first();
               if (await item.isVisible({ timeout: 2000 })) {
                 await item.click();
                 console.log('   ✓ Clicked item in Hunts');
+                itemClicked = true;
                 await page.waitForTimeout(3000);
                 
                 // Try to click an item detail within the hunt to go to collectible
-                try {
-                  const detailSelectors = [
-                    '.collectible-item',
-                    'article',
-                    'div[role="button"]'
-                  ];
-                  
-                  for (const detailSelector of detailSelectors) {
-                    try {
-                      const detailItem = await page.locator(detailSelector).first();
-                      if (await detailItem.isVisible({ timeout: 2000 })) {
-                        await detailItem.click();
-                        console.log('   ✓ Clicked item detail (should go to collectible)');
-                        await page.waitForTimeout(3000);
-                        
-                        const collectibleUrl = page.url();
-                        console.log(`   ✓ At collectible: ${collectibleUrl}`);
-                        break;
-                      }
-                    } catch (e) {
-                      continue;
+                console.log('   Looking for collectible item within hunt...');
+                const collectibleSelectors = [
+                  'article',
+                  '[data-testid*="collectible"]',
+                  '[data-type="collectible"]',
+                  'div[role="button"]',
+                  'a[href*="collectible"]'
+                ];
+                
+                for (const collSelector of collectibleSelectors) {
+                  try {
+                    const collectibleItem = await page.locator(collSelector).first();
+                    if (await collectibleItem.isVisible({ timeout: 2000 })) {
+                      await collectibleItem.click();
+                      console.log('   ✓ Clicked collectible item from hunt detail');
+                      await page.waitForTimeout(3000);
+                      
+                      const collectibleUrl = page.url();
+                      console.log(`   ✓ At collectible: ${collectibleUrl}`);
+                      break;
                     }
+                  } catch (e) {
+                    continue;
                   }
-                } catch (e) {
-                  console.log('   ⚠️ Could not navigate to collectible from hunt');
                 }
                 
                 break;
@@ -556,10 +690,17 @@ const testResults = {};
             }
           }
 
-          testResults[deviceName].navigationTest.hunts = {
-            status: 'pass',
-            message: 'Successfully navigated Hunts section'
-          };
+          if (itemClicked) {
+            testResults[deviceName].navigationTest.hunts = {
+              status: 'pass',
+              message: 'Successfully navigated Hunts section'
+            };
+          } else {
+            testResults[deviceName].navigationTest.hunts = {
+              status: 'fail',
+              message: 'Could not click item in Hunts'
+            };
+          }
         } catch (error) {
           console.log(`   ❌ Hunts navigation error: ${error.message}`);
           testResults[deviceName].navigationTest.hunts = {
