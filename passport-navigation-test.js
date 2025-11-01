@@ -82,6 +82,7 @@ const testResults = {};
   await fs.mkdir('./passport-screenshots', { recursive: true });
 
   const passportUrl = 'https://passport.poap.studio/version-32bmw/collection/custom-demo-flow-1/collection';
+  const loginUrl = 'https://passport.poap.studio/version-32bmw/collection/custom-demo-flow-1/login';
 
   // Loop through each device
   for (const deviceName of devicesToTest) {
@@ -147,10 +148,11 @@ const testResults = {};
             timeout: 60000
           });
 
-          await page.waitForTimeout(3000);
+          await page.waitForTimeout(2000);
+          console.log(`   Current URL: ${page.url()}`);
 
           // STEP 1: Click the initial "Start" button on welcome page
-          console.log('   Looking for initial Start button...');
+          console.log('   Looking for Start button...');
           const initialStartSelectors = [
             'button:has-text("Start")',
             'button:has-text("Get Started")',
@@ -166,9 +168,8 @@ const testResults = {};
               const startButton = await page.locator(selector).first();
               if (await startButton.isVisible({ timeout: 3000 })) {
                 await startButton.click();
-                console.log(`   ✓ Clicked initial Start button`);
+                console.log(`   ✓ Clicked Start button`);
                 startClicked = true;
-                await page.waitForTimeout(2000);
                 break;
               }
             } catch (e) {
@@ -177,10 +178,22 @@ const testResults = {};
           }
 
           if (!startClicked) {
-            console.log('   ⚠️ Could not find initial Start button, trying to continue...');
+            console.log('   ⚠️ Could not find Start button');
           }
 
-          // STEP 2: Now find and fill the input field
+          // STEP 2: Wait for navigation to /login page
+          console.log('   Waiting for login page...');
+          try {
+            await page.waitForURL('**/login', { timeout: 10000 });
+            console.log(`   ✓ Navigated to login page: ${page.url()}`);
+          } catch (e) {
+            console.log(`   ⚠️ Did not navigate to login page. Current URL: ${page.url()}`);
+          }
+
+          await page.waitForTimeout(2000);
+
+          // STEP 3: Now find and fill the input field
+          console.log('   Looking for input field...');
           const inputSelectors = [
             'input[type="email"]',
             'input[placeholder*="email" i]',
@@ -208,7 +221,7 @@ const testResults = {};
           }
 
           if (!inputFilled) {
-            console.log('   ⚠️ Could not find input field');
+            console.log('   ❌ Could not find input field');
             testResults[deviceName].validationTests[scenario.name] = {
               status: 'error',
               message: 'Input field not found'
@@ -216,7 +229,7 @@ const testResults = {};
             continue;
           }
 
-          // STEP 3: Click Continue/Submit button
+          // STEP 4: Click Continue/Submit button
           const submitSelectors = [
             'button:has-text("Continue")',
             'button:has-text("Next")',
@@ -242,7 +255,7 @@ const testResults = {};
 
           await page.waitForTimeout(3000);
 
-          // STEP 4: Check for error message
+          // STEP 5: Check for error message
           const errorKeywords = ['valid', 'invalid', 'error', 'format', 'required', 'incorrect'];
           let foundError = false;
 
@@ -272,9 +285,13 @@ const testResults = {};
 
           if (!foundError) {
             console.log(`   ❌ No error message found`);
+            const screenshotPath = `./passport-screenshots/${deviceFilename}-${scenario.name}-no-error.png`;
+            await page.screenshot({ path: screenshotPath, fullPage: true });
+            
             testResults[deviceName].validationTests[scenario.name] = {
               status: 'fail',
-              message: 'Expected error message not found'
+              message: 'Expected error message not found',
+              screenshot: screenshotPath
             };
           }
 
@@ -299,10 +316,11 @@ const testResults = {};
           timeout: 60000
         });
 
-        await page.waitForTimeout(3000);
+        await page.waitForTimeout(2000);
+        console.log(`Starting at: ${page.url()}`);
 
         // STEP 1: Click initial Start button
-        console.log('Clicking initial Start button...');
+        console.log('Clicking Start button...');
         const initialStartSelectors = [
           'button:has-text("Start")',
           'button:has-text("Get Started")',
@@ -311,13 +329,14 @@ const testResults = {};
           'button'
         ];
 
+        let startClicked = false;
         for (const selector of initialStartSelectors) {
           try {
             const startButton = await page.locator(selector).first();
             if (await startButton.isVisible({ timeout: 3000 })) {
               await startButton.click();
-              console.log('✓ Clicked initial Start button');
-              await page.waitForTimeout(2000);
+              console.log('✓ Clicked Start button');
+              startClicked = true;
               break;
             }
           } catch (e) {
@@ -325,7 +344,22 @@ const testResults = {};
           }
         }
 
-        // STEP 2: Enter valid email
+        if (!startClicked) {
+          throw new Error('Could not find Start button');
+        }
+
+        // STEP 2: Wait for navigation to /login page
+        console.log('Waiting for login page...');
+        try {
+          await page.waitForURL('**/login', { timeout: 10000 });
+          console.log(`✓ Navigated to: ${page.url()}`);
+        } catch (e) {
+          console.log(`⚠️ Not at login page. Current URL: ${page.url()}`);
+        }
+
+        await page.waitForTimeout(2000);
+
+        // STEP 3: Enter valid email
         const timestamp = Date.now();
         const validEmail = `test${timestamp}@example.com`;
         
@@ -355,10 +389,11 @@ const testResults = {};
         }
 
         if (!inputFound) {
-          throw new Error('Could not find input field after clicking Start');
+          throw new Error('Could not find input field on login page');
         }
 
-        // STEP 3: Click Continue/Submit
+        // STEP 4: Click Continue/Submit
+        console.log('Clicking Continue...');
         const submitSelectors = [
           'button:has-text("Continue")',
           'button:has-text("Next")',
@@ -381,8 +416,8 @@ const testResults = {};
 
         await page.waitForTimeout(4000);
 
-        const initialUrl = page.url();
-        console.log(`Current URL: ${initialUrl}`);
+        const currentUrl = page.url();
+        console.log(`Current URL after login: ${currentUrl}`);
 
         // Navigate to Collection section and click an item
         console.log('\n1. Testing Collection section...');
@@ -400,7 +435,7 @@ const testResults = {};
           for (const selector of collectionSelectors) {
             try {
               const collectionLink = await page.locator(selector).first();
-              if (await collectionLink.isVisible({ timeout: 2000 })) {
+              if (await collectionLink.isVisible({ timeout: 3000 })) {
                 await collectionLink.click();
                 console.log('   ✓ Clicked Collection section');
                 collectionFound = true;
@@ -428,17 +463,13 @@ const testResults = {};
           let itemClicked = false;
           for (const selector of itemSelectors) {
             try {
-              const item = await page.locator(selector).first();
-              if (await item.isVisible({ timeout: 2000 })) {
-                await item.click();
-                console.log('   ✓ Clicked item in Collection (should be a Benefit)');
+              const items = await page.locator(selector).all();
+              if (items.length > 0) {
+                await items[0].click();
+                console.log('   ✓ Clicked item in Collection');
                 itemClicked = true;
                 await page.waitForTimeout(3000);
-                
-                const newUrl = page.url();
-                if (newUrl !== initialUrl) {
-                  console.log(`   ✓ Navigated to: ${newUrl}`);
-                }
+                console.log(`   ✓ Current URL: ${page.url()}`);
                 break;
               }
             } catch (e) {
@@ -465,26 +496,7 @@ const testResults = {};
           };
         }
 
-        // Go back to main page
-        console.log('\n   Going back to main page...');
-        await page.goto(passportUrl, { waitUntil: 'networkidle' });
-        await page.waitForTimeout(3000);
-
-        // Click Start again
-        for (const selector of initialStartSelectors) {
-          try {
-            const startButton = await page.locator(selector).first();
-            if (await startButton.isVisible({ timeout: 2000 })) {
-              await startButton.click();
-              await page.waitForTimeout(2000);
-              break;
-            }
-          } catch (e) {
-            continue;
-          }
-        }
-
-        // Navigate to Benefits section and click an item
+        // Navigate to Benefits section
         console.log('\n2. Testing Benefits section...');
         try {
           const benefitsSelectors = [
@@ -499,7 +511,7 @@ const testResults = {};
           for (const selector of benefitsSelectors) {
             try {
               const benefitsLink = await page.locator(selector).first();
-              if (await benefitsLink.isVisible({ timeout: 2000 })) {
+              if (await benefitsLink.isVisible({ timeout: 3000 })) {
                 await benefitsLink.click();
                 console.log('   ✓ Clicked Benefits section');
                 benefitsFound = true;
@@ -527,33 +539,29 @@ const testResults = {};
           let itemClicked = false;
           for (const selector of itemSelectors) {
             try {
-              const item = await page.locator(selector).first();
-              if (await item.isVisible({ timeout: 2000 })) {
-                await item.click();
-                console.log('   ✓ Clicked item in Benefits');
+              const items = await page.locator(selector).all();
+              if (items.length > 0) {
+                await items[0].click();
+                console.log('   ✓ Clicked benefit item');
                 itemClicked = true;
                 await page.waitForTimeout(3000);
                 
-                // Try to click an item detail within the benefit to go to collectible
-                console.log('   Looking for collectible item within benefit...');
+                // Try to click a collectible within the benefit
+                console.log('   Looking for collectible...');
                 const collectibleSelectors = [
                   'article',
                   '[data-testid*="collectible"]',
-                  '[data-type="collectible"]',
-                  'div[role="button"]',
-                  'a[href*="collectible"]'
+                  'div[role="button"]'
                 ];
                 
                 for (const collSelector of collectibleSelectors) {
                   try {
-                    const collectibleItem = await page.locator(collSelector).first();
-                    if (await collectibleItem.isVisible({ timeout: 2000 })) {
-                      await collectibleItem.click();
-                      console.log('   ✓ Clicked collectible item from benefit detail');
+                    const collectibles = await page.locator(collSelector).all();
+                    if (collectibles.length > 0) {
+                      await collectibles[0].click();
+                      console.log('   ✓ Clicked collectible from benefit');
                       await page.waitForTimeout(3000);
-                      
-                      const collectibleUrl = page.url();
-                      console.log(`   ✓ At collectible: ${collectibleUrl}`);
+                      console.log(`   ✓ Current URL: ${page.url()}`);
                       break;
                     }
                   } catch (e) {
@@ -587,26 +595,7 @@ const testResults = {};
           };
         }
 
-        // Go back to main page
-        console.log('\n   Going back to main page...');
-        await page.goto(passportUrl, { waitUntil: 'networkidle' });
-        await page.waitForTimeout(3000);
-
-        // Click Start again
-        for (const selector of initialStartSelectors) {
-          try {
-            const startButton = await page.locator(selector).first();
-            if (await startButton.isVisible({ timeout: 2000 })) {
-              await startButton.click();
-              await page.waitForTimeout(2000);
-              break;
-            }
-          } catch (e) {
-            continue;
-          }
-        }
-
-        // Navigate to Hunts section and click an item
+        // Navigate to Hunts section
         console.log('\n3. Testing Hunts section...');
         try {
           const huntsSelectors = [
@@ -621,7 +610,7 @@ const testResults = {};
           for (const selector of huntsSelectors) {
             try {
               const huntsLink = await page.locator(selector).first();
-              if (await huntsLink.isVisible({ timeout: 2000 })) {
+              if (await huntsLink.isVisible({ timeout: 3000 })) {
                 await huntsLink.click();
                 console.log('   ✓ Clicked Hunts section');
                 huntsFound = true;
@@ -649,33 +638,29 @@ const testResults = {};
           let itemClicked = false;
           for (const selector of itemSelectors) {
             try {
-              const item = await page.locator(selector).first();
-              if (await item.isVisible({ timeout: 2000 })) {
-                await item.click();
-                console.log('   ✓ Clicked item in Hunts');
+              const items = await page.locator(selector).all();
+              if (items.length > 0) {
+                await items[0].click();
+                console.log('   ✓ Clicked hunt item');
                 itemClicked = true;
                 await page.waitForTimeout(3000);
                 
-                // Try to click an item detail within the hunt to go to collectible
-                console.log('   Looking for collectible item within hunt...');
+                // Try to click a collectible within the hunt
+                console.log('   Looking for collectible...');
                 const collectibleSelectors = [
                   'article',
                   '[data-testid*="collectible"]',
-                  '[data-type="collectible"]',
-                  'div[role="button"]',
-                  'a[href*="collectible"]'
+                  'div[role="button"]'
                 ];
                 
                 for (const collSelector of collectibleSelectors) {
                   try {
-                    const collectibleItem = await page.locator(collSelector).first();
-                    if (await collectibleItem.isVisible({ timeout: 2000 })) {
-                      await collectibleItem.click();
-                      console.log('   ✓ Clicked collectible item from hunt detail');
+                    const collectibles = await page.locator(collSelector).all();
+                    if (collectibles.length > 0) {
+                      await collectibles[0].click();
+                      console.log('   ✓ Clicked collectible from hunt');
                       await page.waitForTimeout(3000);
-                      
-                      const collectibleUrl = page.url();
-                      console.log(`   ✓ At collectible: ${collectibleUrl}`);
+                      console.log(`   ✓ Current URL: ${page.url()}`);
                       break;
                     }
                   } catch (e) {
