@@ -1,0 +1,50 @@
+name: POAP Passport Test (Triggered by n8n)
+
+on:
+  workflow_dispatch:  # Allows manual/API trigger
+  
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+      
+      - name: Install dependencies
+        run: npm install
+      
+      - name: Install Playwright
+        run: npx playwright install chromium
+      
+      - name: Run passport navigation test
+        run: node passport-navigation-test.js
+        
+      - name: Upload videos
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: passport-test-videos
+          path: 'passport-videos/**/*.webm'
+          retention-days: 7
+          
+      - name: Upload screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: passport-test-screenshots
+          path: 'passport-screenshots/**/*.png'
+          retention-days: 7
+          
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: passport-test-results
+          path: 'passport-test-results.json'
+          retention-days: 7
