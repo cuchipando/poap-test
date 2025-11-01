@@ -81,9 +81,8 @@ const testResults = {};
   await fs.mkdir('./passport-videos', { recursive: true });
   await fs.mkdir('./passport-screenshots', { recursive: true });
 
-  // CORRECTED: Start at the welcome page
+  // The URL goes directly to the welcome/form page (no separate welcome page)
   const welcomeUrl = 'https://passport.poap.studio/version-32bmw/collection/custom-demo-flow-1/welcome';
-  const loginUrl = 'https://passport.poap.studio/version-32bmw/collection/custom-demo-flow-1/login';
 
   // Loop through each device
   for (const deviceName of devicesToTest) {
@@ -144,119 +143,24 @@ const testResults = {};
         console.log(`Testing: ${scenario.description}`);
         
         try {
-          // Start at welcome page
+          // Navigate to the page
           await page.goto(welcomeUrl, {
             waitUntil: 'networkidle',
             timeout: 60000
           });
 
           await page.waitForTimeout(2000);
-          console.log(`   Starting at: ${page.url()}`);
+          console.log(`   Current URL: ${page.url()}`);
 
-          // STEP 1: Click the "Start" button on welcome page
-          console.log('   Looking for Start button on Welcome page...');
-          
-          // Take screenshot of welcome page for debugging
-          await page.screenshot({ 
-            path: `./passport-screenshots/${deviceFilename}-welcome-${scenario.name}.png`, 
-            fullPage: true 
-          });
-
-          // Try multiple approaches to find and click the Start button
-          let startClicked = false;
-          
-          // Approach 1: Look for div with text "Start" (buttons are often divs)
-          try {
-            const startDiv = page.locator('div:has-text("Start")').filter({ hasText: /^Start$/ });
-            const count = await startDiv.count();
-            console.log(`   Found ${count} div(s) with "Start" text`);
-            
-            if (count > 0) {
-              // Click the visible one that's likely a button (has cursor pointer or is clickable)
-              for (let i = 0; i < count; i++) {
-                const element = startDiv.nth(i);
-                if (await element.isVisible({ timeout: 2000 })) {
-                  await element.click();
-                  console.log(`   ✓ Clicked Start div (${i})`);
-                  startClicked = true;
-                  break;
-                }
-              }
-            }
-          } catch (e) {
-            console.log(`   Approach 1 failed: ${e.message}`);
-          }
-
-          // Approach 2: Try finding button element
-          if (!startClicked) {
-            try {
-              const buttonElement = page.locator('button').filter({ hasText: 'Start' });
-              if (await buttonElement.isVisible({ timeout: 2000 })) {
-                await buttonElement.click();
-                console.log(`   ✓ Clicked Start button element`);
-                startClicked = true;
-              }
-            } catch (e) {
-              console.log(`   Approach 2 failed: ${e.message}`);
-            }
-          }
-
-          // Approach 3: Try any clickable element with Start text
-          if (!startClicked) {
-            try {
-              const anyStart = page.getByText('Start', { exact: true });
-              if (await anyStart.isVisible({ timeout: 2000 })) {
-                await anyStart.click();
-                console.log(`   ✓ Clicked Start element`);
-                startClicked = true;
-              }
-            } catch (e) {
-              console.log(`   Approach 3 failed: ${e.message}`);
-            }
-          }
-
-          // Approach 4: Try clicking by role
-          if (!startClicked) {
-            try {
-              const buttonRole = page.getByRole('button', { name: /start/i });
-              if (await buttonRole.isVisible({ timeout: 2000 })) {
-                await buttonRole.click();
-                console.log(`   ✓ Clicked Start via role`);
-                startClicked = true;
-              }
-            } catch (e) {
-              console.log(`   Approach 4 failed: ${e.message}`);
-            }
-          }
-
-          if (!startClicked) {
-            console.log('   ⚠️ Could not find or click Start button on welcome page');
-            throw new Error('Start button not found on welcome page');
-          }
-
-          await page.waitForTimeout(2000);
-
-          // STEP 2: Wait for navigation to /login page
-          console.log('   Waiting for login page...');
-          try {
-            await page.waitForURL('**/login', { timeout: 10000 });
-            console.log(`   ✓ Navigated to login page: ${page.url()}`);
-          } catch (e) {
-            console.log(`   ⚠️ Did not navigate to login page. Current URL: ${page.url()}`);
-            // Continue anyway - might already be there
-          }
-
-          await page.waitForTimeout(2000);
-
-          // STEP 3: Now find and fill the input field
+          // STEP 1: Find and fill the input field
           console.log('   Looking for input field...');
           const inputSelectors = [
             'input[type="email"]',
+            'input[type="text"]',
             'input[placeholder*="email" i]',
             'input[placeholder*="ENS" i]',
             'input[placeholder*="ETH" i]',
             'input[placeholder*="address" i]',
-            'input[type="text"]',
             'input'
           ];
 
@@ -285,24 +189,24 @@ const testResults = {};
             continue;
           }
 
-          // STEP 4: Click Continue/Submit button
-          const submitSelectors = [
-            'button:has-text("Continue")',
-            'div:has-text("Continue")',
-            'button:has-text("Next")',
-            'button:has-text("Submit")',
-            'button[type="submit"]',
-            'div[role="button"]:has-text("Continue")'
+          // STEP 2: Click Connect button
+          console.log('   Looking for Connect button...');
+          const connectSelectors = [
+            'button:has-text("Connect")',
+            'div:has-text("Connect")',
+            'button:has-text("connect")',
+            '[role="button"]:has-text("Connect")',
+            'button[type="submit"]'
           ];
 
-          let submitClicked = false;
-          for (const selector of submitSelectors) {
+          let connectClicked = false;
+          for (const selector of connectSelectors) {
             try {
               const button = await page.locator(selector).first();
               if (await button.isVisible({ timeout: 2000 })) {
                 await button.click();
-                submitClicked = true;
-                console.log(`   ✓ Clicked Continue/Submit button`);
+                connectClicked = true;
+                console.log(`   ✓ Clicked Connect button`);
                 break;
               }
             } catch (e) {
@@ -310,16 +214,34 @@ const testResults = {};
             }
           }
 
+          if (!connectClicked) {
+            console.log('   ⚠️ Could not find Connect button');
+          }
+
           await page.waitForTimeout(3000);
 
-          // STEP 5: Check for error message
-          const errorKeywords = ['valid', 'invalid', 'error', 'format', 'required', 'incorrect'];
+          // STEP 3: Check for error message (red text)
+          console.log('   Checking for error message...');
+          
           let foundError = false;
+          
+          // Look for red text or error indicators
+          const errorSelectors = [
+            'text=/valid/i',
+            'text=/invalid/i',
+            'text=/error/i',
+            'text=/incorrect/i',
+            '[class*="error"]',
+            '[class*="invalid"]',
+            '[style*="color: red"]',
+            '[style*="color:red"]',
+            '[style*="color: rgb(255"]'
+          ];
 
-          for (const keyword of errorKeywords) {
+          for (const selector of errorSelectors) {
             try {
-              const errorElement = page.getByText(keyword, { exact: false }).first();
-              if (await errorElement.isVisible().catch(() => false)) {
+              const errorElement = page.locator(selector).first();
+              if (await errorElement.isVisible({ timeout: 2000 })) {
                 const errorText = await errorElement.textContent();
                 foundError = true;
                 console.log(`   ✅ Error detected: "${errorText}"`);
@@ -367,7 +289,7 @@ const testResults = {};
       console.log('\n🗺️  Testing Navigation Flow...\n');
       
       try {
-        // Start fresh at welcome page
+        // Start fresh
         await page.goto(welcomeUrl, {
           waitUntil: 'networkidle',
           timeout: 60000
@@ -376,87 +298,16 @@ const testResults = {};
         await page.waitForTimeout(2000);
         console.log(`Starting at: ${page.url()}`);
 
-        // STEP 1: Click Start button on welcome page
-        console.log('Clicking Start button on Welcome page...');
-        
-        let startClicked = false;
-        
-        // Try the same approaches as in validation
-        // Approach 1: div with "Start" text
-        try {
-          const startDiv = page.locator('div:has-text("Start")').filter({ hasText: /^Start$/ });
-          const count = await startDiv.count();
-          
-          if (count > 0) {
-            for (let i = 0; i < count; i++) {
-              const element = startDiv.nth(i);
-              if (await element.isVisible({ timeout: 2000 })) {
-                await element.click();
-                console.log(`✓ Clicked Start div`);
-                startClicked = true;
-                break;
-              }
-            }
-          }
-        } catch (e) {
-          // Continue to next approach
-        }
-
-        // Approach 2: button element
-        if (!startClicked) {
-          try {
-            const buttonElement = page.locator('button').filter({ hasText: 'Start' });
-            if (await buttonElement.isVisible({ timeout: 2000 })) {
-              await buttonElement.click();
-              console.log(`✓ Clicked Start button`);
-              startClicked = true;
-            }
-          } catch (e) {
-            // Continue
-          }
-        }
-
-        // Approach 3: any element with Start
-        if (!startClicked) {
-          try {
-            const anyStart = page.getByText('Start', { exact: true });
-            if (await anyStart.isVisible({ timeout: 2000 })) {
-              await anyStart.click();
-              console.log(`✓ Clicked Start element`);
-              startClicked = true;
-            }
-          } catch (e) {
-            // Continue
-          }
-        }
-
-        if (!startClicked) {
-          throw new Error('Could not find Start button on welcome page');
-        }
-
-        await page.waitForTimeout(2000);
-
-        // STEP 2: Wait for navigation to /login page
-        console.log('Waiting for login page...');
-        try {
-          await page.waitForURL('**/login', { timeout: 10000 });
-          console.log(`✓ Navigated to: ${page.url()}`);
-        } catch (e) {
-          console.log(`⚠️ Not at login page. Current URL: ${page.url()}`);
-        }
-
-        await page.waitForTimeout(2000);
-
-        // STEP 3: Enter valid email
+        // STEP 1: Enter valid email
         const timestamp = Date.now();
         const validEmail = `test${timestamp}@example.com`;
         
         console.log('Looking for input field...');
         const inputSelectors = [
           'input[type="email"]',
+          'input[type="text"]',
           'input[placeholder*="email" i]',
           'input[placeholder*="address" i]',
-          'input[type="text"]',
           'input'
         ];
 
@@ -477,26 +328,24 @@ const testResults = {};
         }
 
         if (!inputFound) {
-          throw new Error('Could not find input field on login page');
+          throw new Error('Could not find input field');
         }
 
-        // STEP 4: Click Continue/Submit
-        console.log('Clicking Continue...');
-        const submitSelectors = [
-          'button:has-text("Continue")',
-          'div:has-text("Continue")',
-          'button:has-text("Next")',
-          'button:has-text("Submit")',
-          'button[type="submit"]',
-          'div[role="button"]:has-text("Continue")'
+        // STEP 2: Click Connect
+        console.log('Clicking Connect...');
+        const connectSelectors = [
+          'button:has-text("Connect")',
+          'div:has-text("Connect")',
+          '[role="button"]:has-text("Connect")',
+          'button[type="submit"]'
         ];
 
-        for (const selector of submitSelectors) {
+        for (const selector of connectSelectors) {
           try {
             const button = await page.locator(selector).first();
             if (await button.isVisible({ timeout: 2000 })) {
               await button.click();
-              console.log(`✓ Clicked Continue button`);
+              console.log(`✓ Clicked Connect button`);
               break;
             }
           } catch (e) {
@@ -507,7 +356,7 @@ const testResults = {};
         await page.waitForTimeout(4000);
 
         const currentUrl = page.url();
-        console.log(`Current URL after login: ${currentUrl}`);
+        console.log(`Current URL after connect: ${currentUrl}`);
 
         // Navigate to Collection section and click an item
         console.log('\n1. Testing Collection section...');
@@ -542,7 +391,7 @@ const testResults = {};
             console.log('   ℹ️ Collection section not found or already visible');
           }
 
-          // Click first item in collection (these are Benefits)
+          // Click first item in collection
           const itemSelectors = [
             'article',
             '[data-testid*="item"]',
