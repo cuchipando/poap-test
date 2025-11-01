@@ -81,7 +81,8 @@ const testResults = {};
   await fs.mkdir('./passport-videos', { recursive: true });
   await fs.mkdir('./passport-screenshots', { recursive: true });
 
-  const passportUrl = 'https://passport.poap.studio/version-32bmw/collection/custom-demo-flow-1/collection';
+  // CORRECTED: Start at the welcome page
+  const welcomeUrl = 'https://passport.poap.studio/version-32bmw/collection/custom-demo-flow-1/welcome';
   const loginUrl = 'https://passport.poap.studio/version-32bmw/collection/custom-demo-flow-1/login';
 
   // Loop through each device
@@ -143,43 +144,97 @@ const testResults = {};
         console.log(`Testing: ${scenario.description}`);
         
         try {
-          await page.goto(passportUrl, {
+          // Start at welcome page
+          await page.goto(welcomeUrl, {
             waitUntil: 'networkidle',
             timeout: 60000
           });
 
           await page.waitForTimeout(2000);
-          console.log(`   Current URL: ${page.url()}`);
+          console.log(`   Starting at: ${page.url()}`);
 
-          // STEP 1: Click the initial "Start" button on welcome page
-          console.log('   Looking for Start button...');
-          const initialStartSelectors = [
-            'button:has-text("Start")',
-            'button:has-text("Get Started")',
-            'button:has-text("Begin")',
-            'a:has-text("Start")',
-            '[data-action="start"]',
-            'button'
-          ];
+          // STEP 1: Click the "Start" button on welcome page
+          console.log('   Looking for Start button on Welcome page...');
+          
+          // Take screenshot of welcome page for debugging
+          await page.screenshot({ 
+            path: `./passport-screenshots/${deviceFilename}-welcome-${scenario.name}.png`, 
+            fullPage: true 
+          });
 
+          // Try multiple approaches to find and click the Start button
           let startClicked = false;
-          for (const selector of initialStartSelectors) {
+          
+          // Approach 1: Look for div with text "Start" (buttons are often divs)
+          try {
+            const startDiv = page.locator('div:has-text("Start")').filter({ hasText: /^Start$/ });
+            const count = await startDiv.count();
+            console.log(`   Found ${count} div(s) with "Start" text`);
+            
+            if (count > 0) {
+              // Click the visible one that's likely a button (has cursor pointer or is clickable)
+              for (let i = 0; i < count; i++) {
+                const element = startDiv.nth(i);
+                if (await element.isVisible({ timeout: 2000 })) {
+                  await element.click();
+                  console.log(`   ✓ Clicked Start div (${i})`);
+                  startClicked = true;
+                  break;
+                }
+              }
+            }
+          } catch (e) {
+            console.log(`   Approach 1 failed: ${e.message}`);
+          }
+
+          // Approach 2: Try finding button element
+          if (!startClicked) {
             try {
-              const startButton = await page.locator(selector).first();
-              if (await startButton.isVisible({ timeout: 3000 })) {
-                await startButton.click();
-                console.log(`   ✓ Clicked Start button`);
+              const buttonElement = page.locator('button').filter({ hasText: 'Start' });
+              if (await buttonElement.isVisible({ timeout: 2000 })) {
+                await buttonElement.click();
+                console.log(`   ✓ Clicked Start button element`);
                 startClicked = true;
-                break;
               }
             } catch (e) {
-              continue;
+              console.log(`   Approach 2 failed: ${e.message}`);
+            }
+          }
+
+          // Approach 3: Try any clickable element with Start text
+          if (!startClicked) {
+            try {
+              const anyStart = page.getByText('Start', { exact: true });
+              if (await anyStart.isVisible({ timeout: 2000 })) {
+                await anyStart.click();
+                console.log(`   ✓ Clicked Start element`);
+                startClicked = true;
+              }
+            } catch (e) {
+              console.log(`   Approach 3 failed: ${e.message}`);
+            }
+          }
+
+          // Approach 4: Try clicking by role
+          if (!startClicked) {
+            try {
+              const buttonRole = page.getByRole('button', { name: /start/i });
+              if (await buttonRole.isVisible({ timeout: 2000 })) {
+                await buttonRole.click();
+                console.log(`   ✓ Clicked Start via role`);
+                startClicked = true;
+              }
+            } catch (e) {
+              console.log(`   Approach 4 failed: ${e.message}`);
             }
           }
 
           if (!startClicked) {
-            console.log('   ⚠️ Could not find Start button');
+            console.log('   ⚠️ Could not find or click Start button on welcome page');
+            throw new Error('Start button not found on welcome page');
           }
+
+          await page.waitForTimeout(2000);
 
           // STEP 2: Wait for navigation to /login page
           console.log('   Waiting for login page...');
@@ -188,6 +243,7 @@ const testResults = {};
             console.log(`   ✓ Navigated to login page: ${page.url()}`);
           } catch (e) {
             console.log(`   ⚠️ Did not navigate to login page. Current URL: ${page.url()}`);
+            // Continue anyway - might already be there
           }
 
           await page.waitForTimeout(2000);
@@ -232,10 +288,11 @@ const testResults = {};
           // STEP 4: Click Continue/Submit button
           const submitSelectors = [
             'button:has-text("Continue")',
+            'div:has-text("Continue")',
             'button:has-text("Next")',
             'button:has-text("Submit")',
             'button[type="submit"]',
-            'button:not(:has-text("Start"))'
+            'div[role="button"]:has-text("Continue")'
           ];
 
           let submitClicked = false;
@@ -310,8 +367,8 @@ const testResults = {};
       console.log('\n🗺️  Testing Navigation Flow...\n');
       
       try {
-        // Start fresh
-        await page.goto(passportUrl, {
+        // Start fresh at welcome page
+        await page.goto(welcomeUrl, {
           waitUntil: 'networkidle',
           timeout: 60000
         });
@@ -319,34 +376,65 @@ const testResults = {};
         await page.waitForTimeout(2000);
         console.log(`Starting at: ${page.url()}`);
 
-        // STEP 1: Click initial Start button
-        console.log('Clicking Start button...');
-        const initialStartSelectors = [
-          'button:has-text("Start")',
-          'button:has-text("Get Started")',
-          'button:has-text("Begin")',
-          'a:has-text("Start")',
-          'button'
-        ];
-
+        // STEP 1: Click Start button on welcome page
+        console.log('Clicking Start button on Welcome page...');
+        
         let startClicked = false;
-        for (const selector of initialStartSelectors) {
+        
+        // Try the same approaches as in validation
+        // Approach 1: div with "Start" text
+        try {
+          const startDiv = page.locator('div:has-text("Start")').filter({ hasText: /^Start$/ });
+          const count = await startDiv.count();
+          
+          if (count > 0) {
+            for (let i = 0; i < count; i++) {
+              const element = startDiv.nth(i);
+              if (await element.isVisible({ timeout: 2000 })) {
+                await element.click();
+                console.log(`✓ Clicked Start div`);
+                startClicked = true;
+                break;
+              }
+            }
+          }
+        } catch (e) {
+          // Continue to next approach
+        }
+
+        // Approach 2: button element
+        if (!startClicked) {
           try {
-            const startButton = await page.locator(selector).first();
-            if (await startButton.isVisible({ timeout: 3000 })) {
-              await startButton.click();
-              console.log('✓ Clicked Start button');
+            const buttonElement = page.locator('button').filter({ hasText: 'Start' });
+            if (await buttonElement.isVisible({ timeout: 2000 })) {
+              await buttonElement.click();
+              console.log(`✓ Clicked Start button`);
               startClicked = true;
-              break;
             }
           } catch (e) {
-            continue;
+            // Continue
+          }
+        }
+
+        // Approach 3: any element with Start
+        if (!startClicked) {
+          try {
+            const anyStart = page.getByText('Start', { exact: true });
+            if (await anyStart.isVisible({ timeout: 2000 })) {
+              await anyStart.click();
+              console.log(`✓ Clicked Start element`);
+              startClicked = true;
+            }
+          } catch (e) {
+            // Continue
           }
         }
 
         if (!startClicked) {
-          throw new Error('Could not find Start button');
+          throw new Error('Could not find Start button on welcome page');
         }
+
+        await page.waitForTimeout(2000);
 
         // STEP 2: Wait for navigation to /login page
         console.log('Waiting for login page...');
@@ -396,9 +484,11 @@ const testResults = {};
         console.log('Clicking Continue...');
         const submitSelectors = [
           'button:has-text("Continue")',
+          'div:has-text("Continue")',
           'button:has-text("Next")',
           'button:has-text("Submit")',
-          'button[type="submit"]'
+          'button[type="submit"]',
+          'div[role="button"]:has-text("Continue")'
         ];
 
         for (const selector of submitSelectors) {
@@ -428,6 +518,7 @@ const testResults = {};
             '[data-section="collection"]',
             'a:has-text("Collection")',
             'button:has-text("Collection")',
+            'div:has-text("Collection")',
             '[aria-label*="Collection" i]'
           ];
 
@@ -504,6 +595,7 @@ const testResults = {};
             '[data-section="benefits"]',
             'a:has-text("Benefits")',
             'button:has-text("Benefits")',
+            'div:has-text("Benefits")',
             '[aria-label*="Benefits" i]'
           ];
 
@@ -603,6 +695,7 @@ const testResults = {};
             '[data-section="hunts"]',
             'a:has-text("Hunts")',
             'button:has-text("Hunts")',
+            'div:has-text("Hunts")',
             '[aria-label*="Hunts" i]'
           ];
 
